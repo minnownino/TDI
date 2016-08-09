@@ -28,19 +28,16 @@ Example: findSGAUnitGroupName(1)
 Description: Given a TDI database patient id, return is tumor name
 Input: TDI database patient id
 Output: tumor name
-Example: findPatientName(“~~~~~~~~”)
 
 (Intermediate) Function 6: findPatientId(patient_name)
 Description: Given tumor name, return its TDI database patient_id
 Input: tumor name
 OutPut: TDI database patient_id
-Example: findPatientId(“~~~~~~”)
 
 Function 7: findDriverInAGivenTumor(tumor_name)
 Description: Given a tumor, find drivers including SGA and SGA unit/group that are drivers in this tumor. Drivers are defined as regulate no less that 5 DEGs with posterior equal or larger than the threshold for a specific SGA gene and SGA unit/group
 Input: tumor name
 Output: a cvs file with two columns, first column is driver name, second column is numbers of DEGs this driver regulated in given tumor
-Example: findDriverInAGivenTumor(“~~~~~~~”)
 
 Function 8: findDriversForListOfDEGsInAGivenTumor(tumor_name, degList)
 Description: Given a tumor and a list of DEGs, find drivers in this tumor that regulate at least one gene in given DEGs list
