@@ -69,15 +69,11 @@ class TDIqueries:
 	#@Parameter: a tumor name (TCGA patient_id)
 	#@return:  driver SGA in this tumor
 	#to do : number of degs, rank from largest to smallest
-	def findDriverInAGivenTumor(self, patient):
+	def findSGAGeneDriverInAGivenTumor(self, patient):
 		cursor = self.db.cursor()
 		patient_id = self.findPatientId(patient)
-		query = "SELECT patient_id, SGA_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+		query = "SELECT SGA_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
 			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
-
-		query = "SELECT patient_id, SGA_unit_group, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
-
 		cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -91,43 +87,77 @@ class TDIqueries:
 				sga_deg[row[0]].append(row[1])
 		#filter out SGA which regulate less than 5 degs
 		sga_deg = dict((k,v) for k, v in sga_deg.iteritems() if len(v) >= 5)
-			
-		with open("%s.csv"%(patient), 'wb') as csvfile:
-			writer=csv.writer(csvfile, delimiter=',',)
-			writer.writerow(["Driver_Name", "Number of DEGs"])
-			for key in sga_deg.keys():
-				if re.search("^SGAgroup.", SGA) or re.search("^SGA.unit.", SGA):
-					sga = self.findGeneName(key)
-					writer.writerow([sga, len(sga_deg[key])])
-
-		print "finish"
 		return sga_deg
+
+	def findSGAUnitDriverInAGivenTumor(self, patient):
+		cursor = self.db.cursor()
+		patient_id = self.findPatientId(patient)
+		query = "SELECT SGA_unit_group, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
+		cursor.execute(query)
+		results = cursor.fetchall()
+		cursor.close()
+		#{sga_id : deg_id}
+		sga_deg = {}		
+		for row in results:
+			if sga_deg.has_key(row[0]):
+				sga_deg[row[0]].append(row[1])
+			else:
+				sga_deg[row[0]] = []
+				sga_deg[row[0]].append(row[1])
+		#filter out SGA which regulate less than 5 degs
+		sga_deg = dict((k,v) for k, v in sga_deg.iteritems() if len(v) >= 5)
+		return sga_deg
+	
+	def findDriverInAGivenTumor(self, patient):
+		gene_driver = findSGAGeneDriverInAGivenTumor(patient)
+		unit_driver = findSGAUnitDriverInAGivenTumor(patient)		
+		with open("%s.csv"%(patient), 'wb') as csvfile:
+			writer = csv.writer(csvfile, delimiter=',',)
+			writer.writerow(["Driver_Name", "Number of DEGs"])
+			for key in gene_driver.keys():				
+				sga = self.findGeneName(key)
+				writer.writerow([sga, len(gene_driver[key])])
+			for key in unit_driver.keys():
+				sga = self.findSGAUnitGroupName(key)
+				writer.writerow([sga, len(unit_driver[key])])
 		
 	#@Parameter: patientname, DEG list 
 	#@Return: SGA driver in this tumor, which at least regulate one gene in given target gene list
 	#@return: how many degs per SGA covers in given deg list
 	def findDriversForListOfDEGsInAGivenTumor(self, patient, degList):
-		cursor = self.db.cursor()
-		sga_deg = self.findDriverInGivenTumor(patient)
+		gene_driver = findSGAGeneDriverInAGivenTumor(patient)
+		unit_driver = findSGAUnitDriverInAGivenTumor(patient)
+
 		degSet = set()
 		for deg in degList:
 			degSet.add(self.findGeneId(deg))
 
-		result = {}
-		for key in sga_deg.keys():
-			targetDEGs = set(sga_degs[key])
+		gene_result = {}
+		for key in gene_driver.keys():
+			targetDEGs = set(gene_driver[key])
 			targets = targetDEGs.intersection(degSet)
 			if (len(targets) != 0):
-				result[key] = []
-				result[key] = targets
+				gene_result[key] = []
+				gene_result[key] = targets
+
+		unit_result = {}
+		for key in unit_driver.keys():
+			targetDEGs = set(unit_driver[key])
+			targets = targetDEGs.intersection(degSet)
+			if (len(targets) != 0):
+				unit_result[key] = []
+				unit_result[key] = targets
 
 		with open("%s.csv"%(patient), 'wb') as csvfile:
 			writer=csv.writer(csvfile, delimiter=',',)
 			writer.writerow(["Drive_name", "Number of DEGs"])
-			for key in result.keys():
+			for key in gene_result.keys():
 				sga = self.findGeneName(key)
-				writer.writerow([sga, len(result[sga])])
-		print "finish"
+				writer.writerow([sga, len(gene_result[sga])])
+			for key in unit_result.keys():
+				sga = self.findSGAUnitGroupName(key)
+				writer.writerow([sga, len(unit_result[sga])])
 
 	#@Parameter: SGA name (a gene or a SGA unit/group)
 	#@Return: List of patient (TDI) id in which input SGA is called a driver
@@ -144,7 +174,6 @@ class TDIqueries:
 			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
 				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s' AND S.name = '%s'"%(sga_id, SGA)
 			cursor.execute(query)
-		
 		results = cursor.fetchall()
 		cursor.close()
 
@@ -162,7 +191,6 @@ class TDIqueries:
 		tumor_deg = dict((k,v) for k, v in tumor_deg.iteritems() if len(v) >= 5)
 
 		#flatten dict {(tumorid, SGA_id) : DEG_id} to list [tumor_id, SGA_id, DEG_id]
-		print len(tumor_deg.keys())
 		return tumor_deg
 
 	#@Parameter : SGA name
@@ -174,7 +202,6 @@ class TDIqueries:
 		cursor.execute(query)
 		tumors =cursor.fetchall()
 		tumors = sum(tumors, ())
-		print "finish"
 		return tumors
 
 	#@Parameter : SGA name, mutation hotspot
@@ -186,7 +213,6 @@ class TDIqueries:
 		cursor.execute(query)
 		tumors =cursor.fetchall()
 		tumors = sum(tumors, ())
-		print "finish"
 		return tumors
 
 	#@Parameter : SGA name
@@ -198,7 +224,6 @@ class TDIqueries:
 		cursor.execute(query)
 		tumors =cursor.fetchall()
 		tumors = sum(tumors, ())
-		print "finish"
 		return tumors
 
 	#@Parameter : SGA name, tumor set
@@ -206,7 +231,6 @@ class TDIqueries:
 	def queryPatientsAndDEGsForAGivenSGAandTumorset(self, SGA, tumors):
 		deg_tumor ={}
 		cursor = self.db.cursor()
-		print "start query deg"
 		if re.search("^SGAgroup.", SGA) or re.search("^SGA.unit.", SGA):
 			sga_id = self.findSGAUnitGroupId(SGA)
 			for tumor in tumors:
@@ -238,7 +262,7 @@ class TDIqueries:
 		cursor.close()
 		return deg_tumor
 
-	#@Parameter: SGA gene name, cutoff
+	#@Parameter: SGA, cutoff
 	#@Return: a csv file contains 4 column, column1 is deg, column2 is tumor name
 	#colum3 is total number of tumors the sga is called a driver, column 4 is number of tumors the deg is called target
 	#1. find tumors called SGA as a driver
@@ -268,14 +292,14 @@ class TDIqueries:
 		print "finish"
 		return deg_tumor
 	
-	#@Parameter: SGA gene name, mutation hotspot
-	#@Return: a csv file contains 4 column, column1 is deg, column2 is tumor name
-	#colum3 is total number of tumors the sga is called a driver, column 4 is number of tumors the deg is called target
+	#@Parameter: SGA gene name, cutoff 
+	#@Return: a csv file contains 4 columns, column1 is DEG name, column2 is numbers of tumors that called given SGA as a driver, 
+	#column3 is numbers of tumors the DEG is called target by given SGA
+	#column4 is call rate(value in second column divided by value is third column)
 	#1. find tumors called SGA as a driver
-	#2. choose tumors have somatic mutations
+	#2. choose tumors have SCNA
 	#3. find target degs in tumors set
 	def findDEGofSCNAForAGivenSGA(self, SGA, cutoff):	
-		SGA_id = self.findGeneId(SGA)
 		tumor_deg = self.findTumorsInWhichAGivenSGAIsDriver(SGA)
 		#total tumors
 		patients = tumor_deg.keys()
@@ -287,7 +311,7 @@ class TDIqueries:
 		print tumorsLen
 		#key : DEG_id
 		#value : tumorid
-		deg_tumor = self.queryPatientsAndDEGsForAGivenSGAandTumorset(SGA_id, tumors)
+		deg_tumor = self.queryPatientsAndDEGsForAGivenSGAandTumorset(SGA, tumors)
 
 		# print deg_tumor
 		with open("%s_SCNA.csv"%(SGA), 'wb') as csvfile:
@@ -301,14 +325,14 @@ class TDIqueries:
 		print "finish"
 		return deg_tumor
 
-	#@Parameter: TCGA SGA gene name
-	#@Return: a csv file contains 4 column, column1 is deg, column2 is tumor name
-	#colum3 is total number of tumors the sga is called a driver, column 4 is number of tumors the deg is called target
+	#@Parameter: SGA gene name, a cutoff
+	#@Return: a csv file contains 4 columns, column1 is DEG name, column2 is numbers of tumors that called given SGA as a driver, 
+	#column3 is numbers of tumors the DEG is called target by given SGA
+	#column4 is call rate(value in second column divided by value is third column)
 	#1. find tumors called SGA as a driver
 	#2. choose tumors have somatic mutations
 	#3. find target degs in tumors set
 	def findDEGsOfSMForAGivenSGA(self, SGA, cutoff):	
-		SGA_id = self.findGeneId(SGA)
 		tumor_deg = self.findTumorsInWhichAGivenSGAIsDriver(SGA)
 		#total tumors
 		patients = tumor_deg.keys()
@@ -319,7 +343,7 @@ class TDIqueries:
 		tumorsLen = len(tumors)
 		#key : DEG_id
 		#value : tumorid
-		deg_tumor = self.queryPatientsAndDEGsForAGivenSGAandTumorset(SGA_id, tumors)
+		deg_tumor = self.queryPatientsAndDEGsForAGivenSGAandTumorset(SGA, tumors)
 
 		# print deg_tumor
 		with open("%s_SM.csv"%(SGA), 'wb') as csvfile:
@@ -333,14 +357,14 @@ class TDIqueries:
 		print "finish"
 		return deg_tumor
 
-	#@Parameter: TCGA SGA gene name, mutation hotspot
-	#@Return: a csv file contains 4 column, column1 is deg, column2 is tumor name
-	#colum3 is total number of tumors the sga is called a driver, column 4 is number of tumors the deg is called target
+	#@Parameter: SGA gene name, mutation hotspot, a cutoff 
+	#@Return: a csv file contains 4 columns, column1 is DEG name, column2 is numbers of tumors that called given SGA as a driver, 
+	#column3 is numbers of tumors the DEG is called target by given SGA
+	#column4 is call rate(value in second column divided by value is third column)
 	#1. find tumors called SGA as a driver
 	#2. choose tumors have somatic mutations
 	#3. find target degs in tumors set
 	def findDEGsInHotspotOfAGivenSGA(self, SGA, hotspot, cutoff):	
-		SGA_id = self.findGeneId(SGA)
 		tumor_deg = self.findTumorsInWhichAGivenSGAIsDriver(SGA)
 		#total tumors
 		patients = tumor_deg.keys()
@@ -364,13 +388,13 @@ class TDIqueries:
 		return deg_tumor
 
 	#@Parameter: TCGA SGA gene name, mutation hotspot
-	#@Return: a csv file contains 4 column, column1 is deg, column2 is tumor name
-	#colum3 is total number of tumors the sga is called a driver, column 4 is number of tumors the deg is called target
+	#@Return: a csv file contains 4 columns, column1 is DEG name, column2 is numbers of tumors that called given SGA as a driver, 
+	#column3 is numbers of tumors the DEG is called target by given SGA
+	#column4 is call rate(value in second column divided by value is third column)
 	#1. find tumors called SGA as a driver
 	#2. choose tumors have somatic mutations
 	#3. find target degs in tumors set
 	def findDEGsInHotspotOfAGivenSGAForTwoHotspot(self, SGA, hotspot1, hotspot2, cutoff):	
-		SGA_id = self.findGeneId(SGA)
 		tumor_deg = self.findTumorsInWhichAGivenSGAIsDriver(SGA)
 		#total tumors
 		patients = tumor_deg.keys()
@@ -378,13 +402,13 @@ class TDIqueries:
 		SMtumor1 = self.findTumorsHasSMForAGivenSGAInGivenHopspot(SGA, hotspot1)
 		SMtumor2 = self.findTumorsHasSMForAGivenSGAInGivenHopspot(SGA, hotspot2)
 		#tumor subset
-		tumors1 = set(patients).intersection(set(	))
+		tumors1 = set(patients).intersection(set(SMtumor1))
 		tumors2 = set(patients).intersection(set(SMtumor2))
 		tumors = tumors1.union(tumors2)
 		tumorsLen = len(tumors)
 		#key : DEG_id
 		#value : tumorid
-		deg_tumor = self.queryPatientsAndDEGsForAGivenSGAandTumorset(SGA_id, tumors)
+		deg_tumor = self.queryPatientsAndDEGsForAGivenSGAandTumorset(SGA, tumors)
 
 		with open("%s_%s_%s.csv"%(SGA, hotspot1, hotspot2), 'wb') as csvfile:
 			writer=csv.writer(csvfile, delimiter=',',)
@@ -414,68 +438,59 @@ class TDIqueries:
 
 		with open('%s.csv'%(SGA), 'wb') as csvfile:
 			writer=csv.writer(csvfile, delimiter=',',)
-			writer.writerow(["Tumor_id", "Alternation_Type", "SCNA", "SM", "AA_norm", "AA_loc", "AA_mut"])
+			writer.writerow(["Tumor_name", "Alternation_Type", "SCNA", "SM", "AA_norm", "AA_loc", "AA_mut"])
+			tumor_name = findPatientName(row[0])
 			for row in SGA_Result:
-				writer.writerow([row[0], "Somatic Mutation", "null", row[1], row[2], row[3], row[4]])
+				writer.writerow([tumor_name, "Somatic Mutation", "null", row[1], row[2], row[3], row[4]])
 			for row in SCNA_Result:
-				writer.writerow([row[0], "SCNA", row[1], "null", "null", "null", "null"])
-		print "finish"
+				writer.writerow([tumor_name, "SCNA", row[1], "null", "null", "null", "null"])
 
-	
-		
-
-
+	#@Parameter: two SGA
+	#@Return: a csv file contains 1 column, indicates the common DEG list for these two SGA
 	def findCommonDEGListForTwoSGA(self, SGA1, SGA2):
-		deg_tumor1 = self.findTargetDEGforAGivenSGA(self.findGeneId(SGA1))
-		deg_tumor2 = self.findTargetDEGforAGivenSGA(self.findGeneId(SGA2))
-		
+		deg_tumor1 = self.findDEGforAGivenSGA(SGA1)
+		deg_tumor2 = self.findDEGforAGivenSGA(SGA2)
+		deg1 = deg_tumor1.keys()
+		deg2 = deg_tumor2.keys()
+		res = deg1.intersection(deg2)
 		with open('%s_%s.csv'%(SGAid1, SGAid2), 'wb') as csvfile:
 			writer=csv.writer(csvfile, delimiter=',',)
 			writer.writerow(["DEG_name"])
-			for row in query_result:
-				writer.writerow([row[0]])
+			for deg in res:
+				writer.writerow([deg])
 
-		print "finish"
-	
-	def findSGADriverForAGivenDEG(self, DEG):
-		deg_id = self.findGeneId(DEG)
-		
-		cursor = self.db.cursor()
-		query = "SELECT gene_name FROM\
-		(SELECT DISTINCT(SGA_id)FROM TDI_Results WHERE DEG_id = '%s' UNION\
-			SELECT DISTINCT(SGA_id) FROM TDI_Results WHERE DEG_id = '%s') as Temp, Genes as G\
-		WHERE G.gene_id = Temp.SGA_id"
-		
-		cursor.execute(query)
-		query_result=cursor.fetchall()
-		cursor.close()
-		with open('%s_%s.csv'%(DEGid1, DEGid2), 'wb') as csvfile:
-			writer=csv.writer(csvfile, delimiter=',',)
-			writer.writerow(["SGA_name"])
-			for row in query_result:
-				writer.writerow([row[0]])
-
-		print "finish"
-
-
-	#must be driver
+	#@Parameter: two DEG 
+	#@Return: a csv file contains 1 column, indicates a SGA driver regulate given pair of DEGs in a tumor
 	def findSGARegulateAPairOfDEGs(self, DEG1, DEG2):
 		deg_id1 = self.findGeneId(DEG1)
 		deg_id2 = self.findGeneId(DEG2)
 
 		cursor = self.db.cursor()
-		query = "SELECT gene_name FROM\
-		(SELECT DISTINCT(SGA_id)FROM TDI_Results WHERE DEG_id = '%s' UNION\
-			SELECT DISTINCT(SGA_id) FROM TDI_Results WHERE DEG_id = '%s') as Temp, Genes as G\
-		WHERE G.gene_id = Temp.SGA_id"
-		
-		cursor.execute(query)
-		query_result=cursor.fetchall()
-		cursor.close()
+		query_allPatients = "SELECT DISTINCT patient_id FROM Patients"
+		cursor.execute(query_allPatients)
+		allPatients = cursor.fetchall()
+		drivers = []
+		for row in allPatients:
+			patient = row[0]
+			query = "SELECT SGA_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient)
+			cursor.execute(query)
+			query_result = cursor.fetchall()
+			temp = {}
+			for row in query_result:
+				if temp.has_key(row[0]):
+					temp[row[0]].append(row[1])
+				else:
+					temp[row[0]] = []
+					temp[row[0]].append(row[1])
+			#filter out SGA which regulate less than 5 degs
+			temp = dict((k,v) for k, v in temp.iteritems() if len(v) >= 5)
+			for key in temp.keys():
+				if deg_id1 in temp[key] and deg_id2 in temp[key]:
+					drivers.append(key)
+
 		with open('%s_%s.csv'%(DEGid1, DEGid2), 'wb') as csvfile:
 			writer=csv.writer(csvfile, delimiter=',',)
 			writer.writerow(["SGA_name"])
-			for row in query_result:
-				writer.writerow([row[0]])
-
-		print "finish"
+			for SGA in drivers:
+				writer.writerow([SGA])
