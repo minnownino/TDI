@@ -109,7 +109,7 @@ Description: given two SGAs (the SGA could be a SGA gene name or a SGA unit/grou
 Input: two SGAs
 Output: a csv file with 1 column of DEG
 
-Function 21: findSGADriverForAGivenDEG(DEG)
+Function 21: findSGARegulateAPairOfDEGs(DEG1, DEG2)
 Description: given a pair of DEGs, find SGA drivers regulate given pair of DEGs in a tumor
 Input: two DEG gene name
 Output: a csv file with 1 column of SGA
