@@ -494,3 +494,163 @@ class TDIqueries:
 			writer.writerow(["SGA_name"])
 			for SGA in drivers:
 				writer.writerow([SGA])
+
+	#@Description: given a SGA unit or a SGA gene, find regualted deg list in driven tumors group by tumor type
+	#@Parameter: SGA, it can be a SGA unit or a SGA gene
+	#@Return: a csv file containning 4 columns. Column1 is cancer type. Column2 is number of tumors which means total numbers of tumors 
+	#has SGA events for given SGA. column3 is number of tumors call driver, which means the number of tumors that called given SGA as a driver
+	#Column4 is is call rate, it comes from the value in column2 divided by column3
+	def findTumorsCalledAGivenSGADriver(self, SGA):
+		cursor = self.db.cursor()
+		tumor_deg = {}
+		if re.search("^SGAgroup.", SGA) or re.search("^SGA.unit.", SGA):
+			sga_id = self.findSGAUnitGroupId(SGA)
+			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(sga_id)
+			cursor.execute(query)
+			query_result = cursor.fetchall()
+			for row in query_result:
+				if tumor_deg.has_key(row[0]):
+					tumor_deg[row[0]].append(row[1])
+				else :
+					tumor_deg[row[0]] = []
+					tumor_deg[row[0]].append(row[1])
+		else: 
+			sga_id = self.findGeneId(SGA)
+			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(sga_id)
+			cursor.execute(query)
+			query_result = cursor.fetchall()
+			for row in query_result:
+				if tumor_deg.has_key(row[0]):
+					tumor_deg[row[0]].append(row[1])
+				else :
+					tumor_deg[row[0]] = []
+					tumor_deg[row[0]].append(row[1])
+		cursor.close()
+
+		{cancerType : [{tumor : deg}]}
+		cancerType_tumor_deg = {}
+		for key in tumor_deg.keys():
+			cancer = self.findCancerType(key)
+			if cancerType_tumor_deg.has_key(cancer):
+				cancerType_tumor_deg[cancer].append(tuple(key, tumor_deg[key]))
+			else :
+				cancerType_tumor_deg[cancer] = []
+				cancerType_tumor_deg[cancer].append(tuple(key, tumor_deg[key]))
+
+		with open("%s_cancer_type_dist.csv"%(SGA), 'wb') as csvfile:
+			writer=csv.writer(csvfile, delimiter=',',)
+			writer.writerow(["Cancer_type", "Number of Tumors", "Number of tumors call driver", "ratio"])
+			for cancer in cancerType_tumor_deg.keys():
+				totalTumors = len(cancerType_tumor_deg[cancer])
+				driverTumors = 0
+				for i in range(0, len(cancerType_tumor_deg[cancer])):
+					if len(cancerType_tumor_deg[cancer][i]) >= 5:
+						driverTumors = driverTumors + 1
+				writer.writerow([cancer, totalTumors, driverTumors, driverTumors/totalTumors])
+		print "Done"
+
+	#@Description: count number of SGA events and number of driver calls and calculate driver call rate for each SGA
+	#@Parameter: SGA, it can be a SGA unit or a SGA gene
+	#@Return: a csv file containning 4 columns. Column1 is SGA. Column2 is number of tumors which means total numbers of tumors 
+	#has SGA events for given SGA. column3 is number of tumors call driver, which means the number of tumors that called given SGA as a driver
+	#Column4 is is call rate, it comes from the value in column2 divided by column3
+	def findAllSGACallRate(self):
+		cursor = self.db.cursor()
+		query_SGAgene = "SELECT DISTINCT gene_id FROM SGAs WHERE gene_id IS NOT NULL"
+		cursor.execute(query_SGAgene)
+		query_SGAgene_result = cursor.fetchall()
+
+		query_SGAunit = "SELECT DISTINCT unit_group_id FROM SGAs WHERE unit_group_id IS NOT NULL"
+		cursor.execute(query_SGAunit)
+		query_SGAunit_result = cursor.fetchall()
+
+		SGA_totalTumor_driverTumor_gene = {}
+		for row in query_SGAgene_result:
+			tumor_deg_gene = {}
+			query = "SELECT T.patient_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(row[0])
+			cursor.execute(query)
+			query_result = cursor.fetchall()
+			for row in query_result:
+				if tumor_deg_gene.has_key(row[0]):
+					tumor_deg_gene[row[0]].append(row[1])
+				else :
+					tumor_deg_gene[row[0]] = []
+					tumor_deg_gene[row[0]].append(row[1])
+			totalTumors = len(tumor_deg_gene.keys())
+			driverTumors = 0
+			for key in tumor_deg_gene.keys():
+				if len(tumor_deg_gene[key]) >= 5:
+					driverTumors = driverTumors + 1
+			SGA_totalTumor_driverTumor_gene[row[0]] = tuple(totalTumors, driverTumors)
+
+		SGA_totalTumor_driverTumor_unit = {}
+		for row in query_SGAunit_result:
+			tumor_dege_unit = {}
+			query = "SELECT T.patient_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(row[0])
+			cursor.execute(query)
+			query_result = cursor.fetchall()
+			for row in query_result:
+				if tumor_dege_unit.has_key(row[0]):
+					tumor_dege_unit[row[0]].append(row[1])
+				else :
+					tumor_dege_unit[row[0]] = []
+					tumor_dege_unit[row[0]].append(row[1])
+			totalTumors = len(tumor_dege_unit.keys())
+			driverTumors = 0
+			for key in tumor_dege_unit.keys():
+				if len(tumor_dege_unit[key]) >= 5:
+					driverTumors = driverTumors + 1
+			SGA_totalTumor_driverTumor_unit[row[0]] = tuple(totalTumors, driverTumors)
+
+		cursor.close()
+		tablename = "AllSGACallRateTable"
+		with open("%s.csv"%(tablename), 'wb') as csvfile:
+			writer=csv.writer(csvfile, delimiter=',',)
+			writer.writerow(["SGA", "Number of Tumors", "Number of tumors call driver", "ratio"])
+			for key in SGA_totalTumor_driverTumor_gene.keys():
+				SGA_geneName = self.findGeneName(key)
+				totalTumors = SGA_totalTumor_driverTumor_gene[key][0]
+				driverTumors = SGA_totalTumor_driverTumor_gene[key][1]
+				writer.writerow([SGA_geneName, totalTumors, driverTumors, driverTumors/totalTumors])
+			for key in SGA_totalTumor_driverTumor_unit.keys():
+				SGA_unitName = self.findSGAUnitGroupName(key)
+				totalTumors = SGA_totalTumor_driverTumor_unit[key][0]
+				driverTumors = SGA_totalTumor_driverTumor_unit[key][1]
+				writer.writerow([SGA_unitName, totalTumors, driverTumors, driverTumors/totalTumors])
+
+		print "Done"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

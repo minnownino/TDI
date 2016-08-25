@@ -114,4 +114,15 @@ Description: given a pair of DEGs, find SGA drivers regulate given pair of DEGs 
 Input: two DEG gene name
 Output: a csv file with 1 column of SGA
 
+Function 22: findTumorsCalledAGivenSGADriver(SGA)
+Description: given a SGA unit or a SGA gene, find regualted deg list in driven tumors group by tumor type
+Input: SGA, it can be a SGA unit or a SGA gene
+Output: a csv file containning 4 columns. Column1 is cancer type. Column2 is number of tumors which means total numbers of tumors has SGA events for given SGA. column3 is number of tumors call driver, which means the number of tumors that called given SGA as a driver. Column4 is is call rate, it comes from the value in column2 divided by column3
+
+Function 23: findAllSGACallRate()
+Description: count number of SGA events and number of driver calls and calculate driver call rate for each SGA
+Input: SGA, it can be a SGA unit or a SGA gene
+Output: a csv file containning 4 columns. Column1 is SGA. Column2 is number of tumors which means total numbers of tumors has SGA events for given SGA. column3 is number of tumors call driver, which means the number of tumors that called given SGA as a driver. Column4 is is call rate, it comes from the value in column2 divided by column3
+
+
 
