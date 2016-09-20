@@ -89,11 +89,14 @@ class TDIqueries:
 		sga_deg = dict((k,v) for k, v in sga_deg.iteritems() if len(v) >= 5)
 		return sga_deg
 
+	#@Parameter: a tumor name (TCGA patient_id)
+	#@return:  driver SGA in this tumor
+	#to do : number of degs, rank from largest to smallest
 	def findSGAUnitDriverInAGivenTumor(self, patient):
 		cursor = self.db.cursor()
 		patient_id = self.findPatientId(patient)
 		query = "SELECT SGA_unit_group, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_unit_group_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
 		cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -109,9 +112,12 @@ class TDIqueries:
 		sga_deg = dict((k,v) for k, v in sga_deg.iteritems() if len(v) >= 5)
 		return sga_deg
 	
+	#@Parameter: a tumor name (TCGA patient_id)
+	#@return:  driver SGA include both genes and unit gene in this tumor
+	#to do : number of degs, rank from largest to smallest
 	def findDriverInAGivenTumor(self, patient):
-		gene_driver = findSGAGeneDriverInAGivenTumor(patient)
-		unit_driver = findSGAUnitDriverInAGivenTumor(patient)		
+		gene_driver = self.findSGAGeneDriverInAGivenTumor(patient)
+		unit_driver = self.findSGAUnitDriverInAGivenTumor(patient)		
 		with open("%s.csv"%(patient), 'wb') as csvfile:
 			writer = csv.writer(csvfile, delimiter=',',)
 			writer.writerow(["Driver_Name", "Number of DEGs"])
@@ -126,8 +132,8 @@ class TDIqueries:
 	#@Return: SGA driver in this tumor, which at least regulate one gene in given target gene list
 	#@return: how many degs per SGA covers in given deg list
 	def findDriversForListOfDEGsInAGivenTumor(self, patient, degList):
-		gene_driver = findSGAGeneDriverInAGivenTumor(patient)
-		unit_driver = findSGAUnitDriverInAGivenTumor(patient)
+		gene_driver = self.findSGAGeneDriverInAGivenTumor(patient)
+		unit_driver = self.findSGAUnitDriverInAGivenTumor(patient)
 
 		degSet = set()
 		for deg in degList:
@@ -189,8 +195,6 @@ class TDIqueries:
 
 		#filter out SGA which regulate less than 5 degs
 		tumor_deg = dict((k,v) for k, v in tumor_deg.iteritems() if len(v) >= 5)
-
-		#flatten dict {(tumorid, SGA_id) : DEG_id} to list [tumor_id, SGA_id, DEG_id]
 		return tumor_deg
 
 	#@Parameter : SGA name
