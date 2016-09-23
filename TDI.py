@@ -40,7 +40,7 @@ class TDIqueries:
 	#@return: SGA unit/group name for this SGA Unit/Group
 	def findSGAUnitGroupName(self, SGA_id):
 		cursor = self.db.cursor()
-		query = "SELECT name FROM SGA_Unit_Group WHERE group_id = '%s'" %(SGA)
+		query = "SELECT name FROM SGA_Unit_Group WHERE group_id = '%s'" %(SGA_id)
 		cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -89,14 +89,11 @@ class TDIqueries:
 		sga_deg = dict((k,v) for k, v in sga_deg.iteritems() if len(v) >= 5)
 		return sga_deg
 
-	#@Parameter: a tumor name (TCGA patient_id)
-	#@return:  driver SGA in this tumor
-	#to do : number of degs, rank from largest to smallest
 	def findSGAUnitDriverInAGivenTumor(self, patient):
 		cursor = self.db.cursor()
 		patient_id = self.findPatientId(patient)
 		query = "SELECT SGA_unit_group, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_unit_group_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
 		cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -112,9 +109,6 @@ class TDIqueries:
 		sga_deg = dict((k,v) for k, v in sga_deg.iteritems() if len(v) >= 5)
 		return sga_deg
 	
-	#@Parameter: a tumor name (TCGA patient_id)
-	#@return:  driver SGA include both genes and unit gene in this tumor
-	#to do : number of degs, rank from largest to smallest
 	def findDriverInAGivenTumor(self, patient):
 		gene_driver = self.findSGAGeneDriverInAGivenTumor(patient)
 		unit_driver = self.findSGAUnitDriverInAGivenTumor(patient)		
@@ -195,6 +189,8 @@ class TDIqueries:
 
 		#filter out SGA which regulate less than 5 degs
 		tumor_deg = dict((k,v) for k, v in tumor_deg.iteritems() if len(v) >= 5)
+
+		#flatten dict {(tumorid, SGA_id) : DEG_id} to list [tumor_id, SGA_id, DEG_id]
 		return tumor_deg
 
 	#@Parameter : SGA name
@@ -571,44 +567,46 @@ class TDIqueries:
 		query_SGAunit_result = cursor.fetchall()
 
 		SGA_totalTumor_driverTumor_gene = {}
-		for row in query_SGAgene_result:
+		for row1 in query_SGAgene_result:
 			tumor_deg_gene = {}
 			query = "SELECT T.patient_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(row[0])
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.SGA_id = '%s'"%(row1[0])
 			cursor.execute(query)
 			query_result = cursor.fetchall()
-			for row in query_result:
-				if tumor_deg_gene.has_key(row[0]):
-					tumor_deg_gene[row[0]].append(row[1])
+			for row2 in query_result:
+				if tumor_deg_gene.has_key(row2[0]):
+					tumor_deg_gene[row2[0]].append(row2[1])
 				else :
-					tumor_deg_gene[row[0]] = []
-					tumor_deg_gene[row[0]].append(row[1])
+					tumor_deg_gene[row2[0]] = []
+					tumor_deg_gene[row2[0]].append(row2[1])
 			totalTumors = len(tumor_deg_gene.keys())
 			driverTumors = 0
 			for key in tumor_deg_gene.keys():
 				if len(tumor_deg_gene[key]) >= 5:
 					driverTumors = driverTumors + 1
-			SGA_totalTumor_driverTumor_gene[row[0]] = tuple(totalTumors, driverTumors)
+			if totalTumors != 0:
+				SGA_totalTumor_driverTumor_gene[row1[0]] = tuple(totalTumors, driverTumors)
 
 		SGA_totalTumor_driverTumor_unit = {}
-		for row in query_SGAunit_result:
+		for row1 in query_SGAunit_result:
 			tumor_dege_unit = {}
 			query = "SELECT T.patient_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(row[0])
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_unit_group_id = S.group_id AND T.SGA_unit_group_id = '%s'"%(row1[0])
 			cursor.execute(query)
 			query_result = cursor.fetchall()
-			for row in query_result:
-				if tumor_dege_unit.has_key(row[0]):
-					tumor_dege_unit[row[0]].append(row[1])
+			for row2 in query_result:
+				if tumor_dege_unit.has_key(row2[0]):
+					tumor_dege_unit[row2[0]].append(row2[1])
 				else :
-					tumor_dege_unit[row[0]] = []
-					tumor_dege_unit[row[0]].append(row[1])
+					tumor_dege_unit[row2[0]] = []
+					tumor_dege_unit[row2[0]].append(row2[1])
 			totalTumors = len(tumor_dege_unit.keys())
 			driverTumors = 0
 			for key in tumor_dege_unit.keys():
 				if len(tumor_dege_unit[key]) >= 5:
 					driverTumors = driverTumors + 1
-			SGA_totalTumor_driverTumor_unit[row[0]] = tuple(totalTumors, driverTumors)
+			if totalTumors != 0:
+				SGA_totalTumor_driverTumor_unit[row1[0]] = tuple(totalTumors, driverTumors)
 
 		cursor.close()
 		tablename = "AllSGACallRateTable"
@@ -628,7 +626,12 @@ class TDIqueries:
 
 		print "Done"
 
+def main():
+	tdi = TDIqueries()
+	tdi.findDEGforAGivenSGA("PIK3CA")
 
+if __name__ == "__main__":
+    main()
 
 
 

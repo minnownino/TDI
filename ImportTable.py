@@ -57,7 +57,28 @@ def populateSMTable(inputFile, delimiter):
 			mydb.rollback()
 	print "finish"
 
-populateNoiseThresholdTable("PANCAN.PostProbcutoff.perGT.p=0.001..v9.4Drlu.csv", ",")
+def populateGlobalDriverTable(inputFile, delimiter):
+	mydb = MySQLdb.connect("localhost", "fanyu", "hellowork", "TDI")
+	cursor = mydb.cursor()
+	geneTableInput = open(inputFile, "r")
+	for line in geneTableInput:
+		dataFields = line.strip().split(delimiter)
+		#print len(dataFields)
+		#if len(dataFields) > 0 :
+		#form the sql query by parsing a line from the input file
+		# str1 = dataFields[0].replace("'", "''")
+		# str2 = dataFields[1].replace("'", "''")
+		sql = "INSERT IGNORE INTO Global_Driver(DEG_name, SGA_name) VALUES('%s', '%s')" %(dataFields[0], dataFields[1])
+		try:
+			cursor.execute(sql)
+			mydb.commit()
+		except:
+			print "Error trying to input gene into table."
+			print sql
+			mydb.rollback()
+	print "finish"
+
+populateGlobalDriverTable("../PANCAN.global.driver.dict.csv", ",")
 
 # CREATE TABLE SGAPPNoiseThreshold (
 # 	id int(11) NOT NULL AUTO_INCREMENT,  
@@ -70,9 +91,20 @@ populateNoiseThresholdTable("PANCAN.PostProbcutoff.perGT.p=0.001..v9.4Drlu.csv",
 # 	CONSTRAINT Noises_ibfk_1 FOREIGN KEY (exp_id) REFERENCES Experiments (exp_id) ON DELETE CASCADE, 
 # 	CONSTRAINT Noises_ibfk_2 FOREIGN KEY (gene_id) REFERENCES Genes (gene_id) ON DELETE CASCADE, 
 # 	CONSTRAINT Noises_ibfk_3 FOREIGN KEY (group_id) REFERENCES SGA_Unit_Group (group_id) ON DELETE CASCADE);
-#update SGAPPNoiseThreshold as SP set gene_unit_id =(Select SU.group_id from SGA_Unit_Group as SU where SP.name = SU.name);
-#update SGAPPNoiseThreshold as SP set gene_unit_id =(Select G.gene_id from Genes as G where SP.name = G.gene_name) where SP.gene_unit_id = 0;
-#CREATE TABLE SGAs (SGA_id int(11) NOT NULL AUTO_INCREMENT, patient_id int(50), gene_id int(11), unit_group_id int(11), patient_name varchar(50), SGA_name varchar(50), PRIMARY KEY(SGA_id), CONSTRAINT SGAs_ibfk_1 FOREIGN KEY (patient_id) REFERENCES Patients (Patient_id) ON DELETE CASCADE, CONSTRAINT SGAs_ibfk_2 FOREIGN KEY (gene_id) REFERENCES Genes (gene_id) ON DELETE CASCADE, CONSTRAINT SGAs_ibfk_3 FOREIGN KEY (unit_group_id) REFERENCES SGA_Unit_Group (group_id) ON DELETE CASCADE);
+# update SGAPPNoiseThreshold as SP set group_id =(Select SU.group_id from SGA_Unit_Group as SU where SP.name = SU.name);
+# update SGAPPNoiseThreshold as SP set gene_id =(Select G.gene_id from Genes as G where SP.name = G.gene_name) where SP.gene_unit_id = 0;
+
+# CREATE TABLE SGAs (
+# 	SGA_id int(11) NOT NULL AUTO_INCREMENT, 
+# 	patient_id int(50), 
+# 	gene_id int(11), 
+# 	unit_group_id int(11), 
+# 	patient_name varchar(50), 
+# 	SGA_name varchar(50), 
+# 	PRIMARY KEY(SGA_id), 
+# 	CONSTRAINT SGAs_ibfk_1 FOREIGN KEY (patient_id) REFERENCES Patients (Patient_id) ON DELETE CASCADE, 
+# 	CONSTRAINT SGAs_ibfk_2 FOREIGN KEY (gene_id) REFERENCES Genes (gene_id) ON DELETE CASCADE, 
+# 	CONSTRAINT SGAs_ibfk_3 FOREIGN KEY (unit_group_id) REFERENCES SGA_Unit_Group (group_id) ON DELETE CASCADE);
 
 # CREATE TABLE Somatic_Mutations (
 # 	sm_id int(11) NOT NULL AUTO_INCREMENT, 
@@ -95,4 +127,18 @@ populateNoiseThresholdTable("PANCAN.PostProbcutoff.perGT.p=0.001..v9.4Drlu.csv",
 # 	aa_loc varchar(20) DEFAULT NULL,
 # 	aa_mut varchar(20) DEFAULT NULL,
 # 	protein_func_impact varchar(20) DEFAULT NULL,
-# 	PRIMARY KEY(sm_id), CONSTRAINT Somatic_Mutations_ibfk_1 FOREIGN KEY (patient_id) REFERENCES Patients (Patient_id) ON DELETE CASCADE, CONSTRAINT Somatic_Mutations_ibfk_1 FOREIGN KEY (gene_id) REFERENCES Genes (gene_id) ON DELETE CASCADE);
+# 	PRIMARY KEY(sm_id), 
+#   CONSTRAINT Somatic_Mutations_ibfk_1 FOREIGN KEY (patient_id) REFERENCES Patients (Patient_id) ON DELETE CASCADE, 
+#   CONSTRAINT Somatic_Mutations_ibfk_1 FOREIGN KEY (gene_id) REFERENCES Genes (gene_id) ON DELETE CASCADE);
+
+# CREATE TABLE Global_Driver (
+# 	id int(11) NOT NULL AUTO_INCREMENT,  
+# 	SGA_id int(11) DEFAULT NULL,
+# 	DEG_id int(11) DEFAULT NULL,  
+# 	SGA_name varchar(50) DEFAULT NULL,
+# 	DEG_name varchar(50) DEFAULT NULL,  
+# 	PRIMARY KEY (id), 
+# 	CONSTRAINT GD_ibfk_1 FOREIGN KEY (SGA_id) REFERENCES Genes (gene_id) ON DELETE CASCADE, 
+# 	CONSTRAINT GD_ibfk_2 FOREIGN KEY (DEG_id) REFERENCES Genes (gene_id) ON DELETE CASCADE);
+# update Global_Driver as GD set SGA_id =(Select Genes.gene_id from Genes where Genes.gene_name = GD.SGA_name);
+# update Global_Driver as GD set DEG_id =(Select Genes.gene_id from Genes where Genes.gene_name = GD.DEG_name);
