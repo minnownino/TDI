@@ -3,6 +3,7 @@ import csv
 import re
 
 class TDIqueries:
+        #Database connection requires : host, username, password, databse name
 	def __init__(self):
 		self.db = MySQLdb.connect("localhost", "fanyu", "hellowork", "TDI")
 
@@ -17,7 +18,7 @@ class TDIqueries:
 		return results[0][0]
 
 	#@parameter: TDI database gene_id
-	#@return: gene name for in put gene
+	#@return: gene name for input gene
 	def findGeneName(self, geneID):
 		cursor = self.db.cursor()
 		query = "SELECT gene_name FROM Genes WHERE gene_id= '%s'" %(geneID)
@@ -73,7 +74,7 @@ class TDIqueries:
 		cursor = self.db.cursor()
 		patient_id = self.findPatientId(patient)
 		query = "SELECT SGA_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.patient_id = '%s'"%(patient_id)
 		cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -92,8 +93,8 @@ class TDIqueries:
 	def findSGAUnitDriverInAGivenTumor(self, patient):
 		cursor = self.db.cursor()
 		patient_id = self.findPatientId(patient)
-		query = "SELECT SGA_unit_group, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient_id)
+		query = "SELECT T.gt_unit_group_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.gt_unit_group_id = S.group_id AND T.patient_id = '%s'"%(patient_id)
 		cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -166,13 +167,13 @@ class TDIqueries:
 		if re.search("^SGAgroup.", SGA) or re.search("^SGA.unit.", SGA):
 			sga_id = self.findSGAUnitGroupId(SGA)
 			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_unit_group_id = S.gene_unit_id AND T.SGA_unit_group_id = '%s'\
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.gt_unit_group_id = S.group_id AND T.gt_unit_group_id = '%s'\
 				AND S.name = '%s'"%(sga_id, SGA)
 			cursor.execute(query)
 		else: 
 			sga_id = self.findGeneId(SGA)
 			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s' AND S.name = '%s'"%(sga_id, SGA)
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.SGA_id = '%s' AND S.name = '%s'"%(sga_id, SGA)
 			cursor.execute(query)
 		results = cursor.fetchall()
 		cursor.close()
@@ -235,7 +236,7 @@ class TDIqueries:
 			sga_id = self.findSGAUnitGroupId(SGA)
 			for tumor in tumors:
 				query = "SELECT DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-					WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_unit_group_id = S.gene_unit_id AND T.SGA_unit_group_id = '%s'\
+					WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.gt_unit_group_id = S.group_id AND T.gt_unit_group_id = '%s'\
 					AND S.name = '%s' AND T.patient_id = '%s'"%(sga_id, SGA, tumor)
 				cursor.execute(query)
 				query_result=cursor.fetchall()
@@ -249,7 +250,7 @@ class TDIqueries:
 			sga_id = self.findGeneId(SGA)
 			for tumor in tumors:
 				query = "SELECT DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-					WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'\
+					WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.SGA_id = '%s'\
 					AND S.name = '%s' AND T.patient_id = '%s'"%(sga_id, SGA, tumor)
 				cursor.execute(query)
 				query_result=cursor.fetchall()
@@ -473,7 +474,7 @@ class TDIqueries:
 		for row in allPatients:
 			patient = row[0]
 			query = "SELECT SGA_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.patient_id = '%s'"%(patient)
+			WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.patient_id = '%s'"%(patient)
 			cursor.execute(query)
 			query_result = cursor.fetchall()
 			temp = {}
@@ -506,7 +507,7 @@ class TDIqueries:
 		if re.search("^SGAgroup.", SGA) or re.search("^SGA.unit.", SGA):
 			sga_id = self.findSGAUnitGroupId(SGA)
 			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(sga_id)
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.gt_unit_group_id = S.group_id AND T.SGA_id = '%s'"%(sga_id)
 			cursor.execute(query)
 			query_result = cursor.fetchall()
 			for row in query_result:
@@ -518,7 +519,7 @@ class TDIqueries:
 		else: 
 			sga_id = self.findGeneId(SGA)
 			query = "SELECT patient_id, DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(sga_id)
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.SGA_id = '%s'"%(sga_id)
 			cursor.execute(query)
 			query_result = cursor.fetchall()
 			for row in query_result:
@@ -570,7 +571,7 @@ class TDIqueries:
 		for row in query_SGAgene_result:
 			tumor_deg_gene = {}
 			query = "SELECT T.patient_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(row[0])
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_id AND T.SGA_id = '%s'"%(row[0])
 			cursor.execute(query)
 			query_result = cursor.fetchall()
 			for row in query_result:
@@ -590,7 +591,7 @@ class TDIqueries:
 		for row in query_SGAunit_result:
 			tumor_dege_unit = {}
 			query = "SELECT T.patient_id, T.DEG_id FROM TDI_Results as T, SGAPPNoiseThreshold as S\
-				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.SGA_id = S.gene_unit_id AND T.SGA_id = '%s'"%(row[0])
+				WHERE T.exp_id = 1 AND T.posterior >= S.threshold AND T.gt_unit_group_id = S.group_id AND T.SGA_id = '%s'"%(row[0])
 			cursor.execute(query)
 			query_result = cursor.fetchall()
 			for row in query_result:
